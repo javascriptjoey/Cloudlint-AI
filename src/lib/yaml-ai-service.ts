@@ -54,7 +54,7 @@ export class YAMLAIService {
         improvedYaml,
         confidenceScore: this.calculateConfidenceScore(allSuggestions)
       }
-    } catch (error) {
+    } catch {
       // If YAML is invalid, return empty suggestions
       return {
         hasImprovements: false,

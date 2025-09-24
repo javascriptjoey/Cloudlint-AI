@@ -9,7 +9,8 @@ import { toast } from 'sonner'
 // Components
 import { YAMLEditor } from '@/components/YAMLEditor'
 import { YAMLResultsPanel } from '@/components/YAMLResultsPanel'
-import { YAMLSettingsPanel, useYAMLValidatorSettings, type YAMLValidatorSettings } from '@/components/YAMLSettingsPanel'
+import { YAMLSettingsPanel } from '@/components/YAMLSettingsPanel'
+import { useYAMLValidatorSettings, type YAMLValidatorSettings } from '@/hooks/useYAMLValidatorSettings'
 
 // Services
 import { validateYAML, type ValidationResult } from '@/lib/yaml-validator'

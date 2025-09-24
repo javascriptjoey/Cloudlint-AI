@@ -6,7 +6,7 @@ interface MonacoEditor {
   setScrollTop(scrollTop: number): void
   setPosition(position: { lineNumber: number; column: number }): void
   focus(): void
-  getModel(): any
+  getModel(): unknown
   onDidFocusEditorWidget(callback: () => void): void
   onDidBlurEditorWidget(callback: () => void): void
 }
@@ -27,7 +27,7 @@ export function useMonacoEditor() {
 
   const clearEditor = useCallback(() => {
     if (monacoEditor) {
-      const monaco = (window as any).monaco
+      const monaco = (window as { monaco?: { editor: { setModelMarkers: (model: unknown, owner: string, markers: unknown[]) => void } } }).monaco
       if (monaco) {
         monacoEditor.setValue('')
         monaco.editor.setModelMarkers(monacoEditor.getModel(), 'yamlValidator', [])
@@ -37,7 +37,7 @@ export function useMonacoEditor() {
 
   const clearEditorMarkers = useCallback(() => {
     if (monacoEditor) {
-      const monaco = (window as any).monaco
+      const monaco = (window as { monaco?: { editor: { setModelMarkers: (model: unknown, owner: string, markers: unknown[]) => void } } }).monaco
       if (monaco) {
         monaco.editor.setModelMarkers(monacoEditor.getModel(), 'yaml-validator', [])
       }

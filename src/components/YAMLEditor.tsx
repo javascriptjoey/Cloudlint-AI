@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef } from 'react'
 import Editor, { type Monaco } from '@monaco-editor/react'
 import { type ValidationError } from '@/lib/yaml-validator'
 
+interface MonacoEditorInstance {
+  updateOptions: (options: object) => void
+  getModel: () => unknown
+}
+
 interface YAMLEditorProps {
   readonly value: string
   readonly onChange: (value: string) => void
@@ -20,9 +25,9 @@ export function YAMLEditor({
   className
 }: YAMLEditorProps) {
   const monacoRef = useRef<Monaco | null>(null)
-  const editorRef = useRef<any>(null)
+  const editorRef = useRef<MonacoEditorInstance | null>(null)
 
-  const handleEditorDidMount = useCallback((editor: any, monaco: Monaco) => {
+  const handleEditorDidMount = useCallback((editor: MonacoEditorInstance, monaco: Monaco) => {
     monacoRef.current = monaco
     editorRef.current = editor
 
@@ -136,7 +141,7 @@ export function YAMLEditor({
     if (!model) return
 
     // Clear existing markers
-    monaco.editor.setModelMarkers(model, 'yaml-validator', [])
+    monaco.editor.setModelMarkers(model as Parameters<typeof monaco.editor.setModelMarkers>[0], 'yaml-validator', [])
 
     // Add new error markers
     const markers = errors.map(error => ({
@@ -153,7 +158,7 @@ export function YAMLEditor({
       source: 'YAML Validator'
     }))
 
-    monaco.editor.setModelMarkers(model, 'yaml-validator', markers)
+    monaco.editor.setModelMarkers(model as Parameters<typeof monaco.editor.setModelMarkers>[0], 'yaml-validator', markers)
   }, [errors])
 
   // Update whitespace visibility when prop changes

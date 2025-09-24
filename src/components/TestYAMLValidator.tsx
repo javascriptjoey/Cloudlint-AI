@@ -140,7 +140,7 @@ export function TestYAMLValidator() {
     validateYaml(yamlContent)
     // Clear Monaco editor error markers on validation
     if (monacoEditor) {
-      const monaco = (window as any).monaco
+      const monaco = (window as { monaco?: { editor: { setModelMarkers: (model: unknown, owner: string, markers: unknown[]) => void } } }).monaco
       if (monaco) {
         monaco.editor.setModelMarkers(monacoEditor.getModel(), 'yaml-validator', [])
       }
