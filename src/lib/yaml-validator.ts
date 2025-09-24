@@ -1,18 +1,18 @@
-import { load, YAMLException } from 'js-yaml'
+import { load, type YAMLException } from 'js-yaml'
 
 export interface ValidationError {
-  type: 'syntax' | 'structure' | 'format'
-  line: number
-  column: number
-  message: string
-  suggestion?: string
+  readonly type: 'syntax' | 'structure' | 'format'
+  readonly line: number
+  readonly column: number
+  readonly message: string
+  readonly suggestion?: string
 }
 
 export interface ValidationResult {
-  isValid: boolean
-  errors: ValidationError[]
-  formatted?: string
-  originalYaml: string
+  readonly isValid: boolean
+  readonly errors: readonly ValidationError[]
+  readonly formatted?: string
+  readonly originalYaml: string
 }
 
 export function validateYAML(yamlText: string): ValidationResult {
@@ -24,52 +24,74 @@ export function validateYAML(yamlText: string): ValidationResult {
 
   // Check for empty input
   if (!yamlText.trim()) {
-    result.errors.push({
-      type: 'structure',
-      line: 1,
-      column: 1,
-      message: 'YAML input is empty',
-      suggestion: 'Please enter some YAML content to validate'
-    })
-    return result
+    return {
+      ...result,
+      errors: [{
+        type: 'structure',
+        line: 1,
+        column: 1,
+        message: 'YAML input is empty',
+        suggestion: 'Please enter some YAML content to validate'
+      }]
+    }
   }
 
   try {
-    // Parse YAML
-    const parsed = load(yamlText)
+    // Parse YAML with unknown type for better type safety
+    const parsed: unknown = load(yamlText)
     
     // If parsing succeeds, run additional structural checks
-    result.errors = checkStructuralIssues(yamlText, parsed)
+    const structuralErrors = checkStructuralIssues(yamlText, parsed)
     
-    if (result.errors.length === 0) {
-      result.isValid = true
-      // Format the YAML for display
-      result.formatted = formatYAML(yamlText)
+    if (structuralErrors.length === 0) {
+      return {
+        ...result,
+        isValid: true,
+        errors: [],
+        formatted: formatYAML(yamlText)
+      }
     }
-  } catch (error) {
-    if (error instanceof YAMLException) {
-      result.errors.push({
-        type: 'syntax',
-        line: error.mark?.line ? error.mark.line + 1 : 1,
-        column: error.mark?.column ? error.mark.column + 1 : 1,
-        message: error.reason || 'YAML syntax error',
-        suggestion: getSyntaxSuggestion(error.reason || '')
-      })
-    } else {
-      result.errors.push({
+    
+    return {
+      ...result,
+      errors: structuralErrors
+    }
+  } catch (error: unknown) {
+    // Use proper type guards for error handling
+    if (isYAMLException(error)) {
+      return {
+        ...result,
+        errors: [{
+          type: 'syntax',
+          line: error.mark?.line ? error.mark.line + 1 : 1,
+          column: error.mark?.column ? error.mark.column + 1 : 1,
+          message: error.reason || 'YAML syntax error',
+          suggestion: getSyntaxSuggestion(error.reason || '')
+        }]
+      }
+    }
+    
+    return {
+      ...result,
+      errors: [{
         type: 'syntax',
         line: 1,
         column: 1,
         message: 'Unknown YAML parsing error',
         suggestion: 'Please check your YAML syntax'
-      })
+      }]
     }
   }
-
-  return result
 }
 
-function checkStructuralIssues(yamlText: string, parsed: any): ValidationError[] {
+// Type guard for YAMLException
+function isYAMLException(error: unknown): error is YAMLException {
+  return error instanceof Error && 
+         'reason' in error && 
+         'mark' in error
+}
+
+function checkStructuralIssues(yamlText: string, parsed: unknown): ValidationError[] {
   const errors: ValidationError[] = []
   const lines = yamlText.split('\n')
 
@@ -115,21 +137,29 @@ function checkStructuralIssues(yamlText: string, parsed: any): ValidationError[]
     }
   })
 
-  // Check for duplicate keys at root level
-  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-    checkDuplicateKeys(parsed, errors, yamlText)
+  // Check for duplicate keys at root level with proper type checking
+  if (isRecord(parsed)) {
+    errors.push(...checkDuplicateKeys(parsed, yamlText))
   }
 
   return errors
 }
 
-function checkDuplicateKeys(obj: any, errors: ValidationError[], yamlText: string) {
+// Type guard for record objects
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && 
+         value !== null && 
+         !Array.isArray(value)
+}
+
+function checkDuplicateKeys(obj: Record<string, unknown>, yamlText: string): ValidationError[] {
+  const errors: ValidationError[] = []
   // This is a simplified duplicate key check
   // In practice, js-yaml will throw an error for duplicates during parsing
   const keys = Object.keys(obj)
-  const seen = new Set()
+  const seen = new Set<string>()
   
-  keys.forEach(key => {
+  for (const key of keys) {
     if (seen.has(key)) {
       const lineNumber = findKeyLineNumber(key, yamlText)
       errors.push({
@@ -141,13 +171,15 @@ function checkDuplicateKeys(obj: any, errors: ValidationError[], yamlText: strin
       })
     }
     seen.add(key)
-  })
+  }
+  
+  return errors
 }
 
 function findKeyLineNumber(key: string, yamlText: string): number {
   const lines = yamlText.split('\n')
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim().startsWith(`${key}:`)) {
+    if (lines[i]?.trim().startsWith(`${key}:`)) {
       return i + 1
     }
   }
@@ -181,7 +213,7 @@ function formatYAML(yamlText: string): string {
   }
 }
 
-export function downloadYAML(content: string, filename: string = 'validated.yaml') {
+export function downloadYAML(content: string, filename = 'validated.yaml'): void {
   const blob = new Blob([content], { type: 'text/yaml' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

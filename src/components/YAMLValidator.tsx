@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, type ChangeEvent } from 'react'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { validateYAML, type ValidationResult, type ValidationError } from '@/lib
 import { AlertTriangle, CheckCircle, Copy, Download, FileText } from 'lucide-react'
 
 interface YAMLValidatorProps {
-  className?: string
+  readonly className?: string
 }
 
 export function YAMLValidator({ className }: YAMLValidatorProps) {
@@ -18,7 +18,7 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
   const [isValidating, setIsValidating] = useState(false)
   const [highlightedLines, setHighlightedLines] = useState<Set<number>>(new Set())
 
-  const handleValidation = useCallback(async () => {
+  const handleValidation = useCallback(async (): Promise<void> => {
     if (!yamlContent.trim()) {
       toast.error('Please enter some YAML content to validate')
       return
@@ -26,42 +26,53 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
 
     setIsValidating(true)
     
-    // Simulate async validation (in case we add more complex validation later)
-    setTimeout(() => {
-      const result = validateYAML(yamlContent)
-      setValidationResult(result)
-      
-      // Highlight error lines
-      const errorLines = new Set(result.errors.map(error => error.line))
-      setHighlightedLines(errorLines)
-      
-      if (result.isValid) {
-        toast.success('YAML is valid! 🎉')
-      } else {
-        toast.error(`Found ${result.errors.length} validation error${result.errors.length === 1 ? '' : 's'}`)
-      }
-      
-      setIsValidating(false)
-    }, 300)
+    // Simulate async validation using modern Promise patterns
+    await new Promise<void>((resolve) => {
+      setTimeout(() => {
+        const result = validateYAML(yamlContent)
+        setValidationResult(result)
+        
+        // Highlight error lines - using modern Set operations
+        const errorLines = new Set(result.errors.map(error => error.line))
+        setHighlightedLines(errorLines)
+        
+        if (result.isValid) {
+          toast.success('YAML is valid! 🎉')
+        } else {
+          const errorCount = result.errors.length
+          toast.error(`Found ${errorCount} validation error${errorCount === 1 ? '' : 's'}`)
+        }
+        
+        setIsValidating(false)
+        resolve()
+      }, 300)
+    })
   }, [yamlContent])
 
-  const handleCopyYAML = useCallback(() => {
-    if (validationResult?.formatted) {
-      navigator.clipboard.writeText(validationResult.formatted)
-      toast.success('Valid YAML copied to clipboard!')
-    } else {
-      navigator.clipboard.writeText(yamlContent)
+  const handleCopyYAML = useCallback(async (): Promise<void> => {
+    const contentToCopy = validationResult?.formatted ?? yamlContent
+    
+    if (!contentToCopy.trim()) {
+      toast.error('No YAML content to copy')
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(contentToCopy)
       toast.success('YAML content copied to clipboard!')
+    } catch (error: unknown) {
+      console.error('Failed to copy to clipboard:', error)
+      toast.error('Failed to copy to clipboard')
     }
   }, [validationResult, yamlContent])
 
-  const handleDownloadYAML = useCallback(() => {
+  const handleDownloadYAML = useCallback((): void => {
     if (!yamlContent.trim()) {
       toast.error('No YAML content to download')
       return
     }
 
-    const contentToDownload = validationResult?.formatted || yamlContent
+    const contentToDownload = validationResult?.formatted ?? yamlContent
     const blob = new Blob([contentToDownload], { type: 'text/yaml' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -75,20 +86,25 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
     toast.success('YAML file downloaded!')
   }, [yamlContent, validationResult])
 
-  const getErrorIcon = (type: ValidationError['type']) => {
+  const handleTextareaChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>): void => {
+    setYamlContent(e.target.value)
+  }, [])
+
+  const getErrorIcon = useCallback((type: ValidationError['type']) => {
+    const iconClass = "h-4 w-4"
     switch (type) {
       case 'syntax':
-        return <AlertTriangle className="h-4 w-4 text-red-500" />
+        return <AlertTriangle className={`${iconClass} text-red-500`} />
       case 'structure':
-        return <AlertTriangle className="h-4 w-4 text-orange-500" />
+        return <AlertTriangle className={`${iconClass} text-orange-500`} />
       case 'format':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
+        return <AlertTriangle className={`${iconClass} text-yellow-500`} />
       default:
-        return <AlertTriangle className="h-4 w-4" />
+        return <AlertTriangle className={iconClass} />
     }
-  }
+  }, [])
 
-  const getErrorTypeColor = (type: ValidationError['type']) => {
+  const getErrorTypeColor = useCallback((type: ValidationError['type']): string => {
     switch (type) {
       case 'syntax':
         return 'text-red-600 bg-red-50 border-red-200'
@@ -99,10 +115,10 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
       default:
         return 'text-gray-600 bg-gray-50 border-gray-200'
     }
-  }
+  }, [])
 
   return (
-    <div className={`w-full max-w-4xl mx-auto p-6 space-y-6 ${className}`}>
+    <div className={`w-full max-w-4xl mx-auto p-6 space-y-6 ${className ?? ''}`}>
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">YAML Validator</h1>
         <p className="text-muted-foreground">
@@ -121,6 +137,7 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
                 variant="outline"
                 size="sm"
                 disabled={!yamlContent.trim()}
+                type="button"
               >
                 <Copy className="h-4 w-4 mr-2" />
                 Copy
@@ -130,6 +147,7 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
                 variant="outline"
                 size="sm"
                 disabled={!yamlContent.trim()}
+                type="button"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Download
@@ -137,6 +155,7 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
               <Button
                 onClick={handleValidation}
                 disabled={!yamlContent.trim() || isValidating}
+                type="button"
               >
                 <FileText className="h-4 w-4 mr-2" />
                 {isValidating ? 'Validating...' : 'Validate YAML'}
@@ -147,11 +166,12 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
           <Textarea
             placeholder="Paste your YAML content here..."
             value={yamlContent}
-            onChange={(e) => setYamlContent(e.target.value)}
+            onChange={handleTextareaChange}
             className="min-h-[300px] font-mono text-sm resize-y"
             style={{
               backgroundColor: highlightedLines.size > 0 ? 'rgb(254 242 242)' : undefined
             }}
+            aria-label="YAML input textarea"
           />
         </div>
 
@@ -186,7 +206,7 @@ export function YAMLValidator({ className }: YAMLValidatorProps) {
                 <ScrollArea className="h-[300px] w-full">
                   <div className="space-y-3 pr-4">
                     {validationResult.errors.map((error, index) => (
-                      <Alert key={index} className={getErrorTypeColor(error.type)}>
+                      <Alert key={`error-${index}`} className={getErrorTypeColor(error.type)}>
                         {getErrorIcon(error.type)}
                         <AlertTitle className="capitalize">
                           {error.type} Error (Line {error.line}, Column {error.column})
